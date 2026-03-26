@@ -1,0 +1,5 @@
+# master script will get the data 
+FROM python:3.11
+
+# add master.py script
+# ADD master.py
