@@ -1,4 +1,0 @@
-# python 3.11 compatible with notebook
-FROM python:3.11
-
-RUN pip install 
