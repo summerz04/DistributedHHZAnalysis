@@ -1,0 +1,37 @@
+version: '3'
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports: 
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - rabbit
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 30s
+      timeout: 30s
+      retries: 3
+  #master: 
+  #build: for_Master/.
+  #command: python master.py
+  #depends_on: 
+  #  - rabbit_mq 
+
+  worker:
+    build: for_Worker/.
+    networks:
+      - rabbit
+   
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+        restart: true
+    command: python worker.py
+  
+networks:
+  rabbit:
+    driver: overlay
+    attachable: true
+
+
