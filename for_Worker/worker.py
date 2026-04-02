@@ -69,6 +69,7 @@ def process_file(file_URL):
     all_events = ak.concatenate(sample_data)
     print(f"Events after cuts: {len(all_events)}", flush=True)
 
+
     # -----------------------------------------------------------------------------------------
     # defining variables for histogram, might create a separate .py file for this later on
     # -----------------------------------------------------------------------------------------
@@ -89,47 +90,7 @@ def process_file(file_URL):
                             bins=bin_edges ) # histogram the data
     data_x_errors = np.sqrt( data_x ) # statistical error on the data
 
-    # *************
-    # Main plot
-    # *************
-    main_axes = plt.gca() # get current axes
-
-    # plot the data points
-    main_axes.errorbar(x=bin_centres, y=data_x, yerr=data_x_errors,
-                        fmt='ko', # 'k' means black and 'o' is for circles
-                        label='Data')
-
-    # set the x-limit of the main axes
-    main_axes.set_xlim( left=xmin, right=xmax )
-
-    # separation of x axis minor ticks
-    main_axes.xaxis.set_minor_locator( AutoMinorLocator() )
-
-    # set the axis tick parameters for the main axes
-    main_axes.tick_params(which='both', # ticks on both x and y axes
-                            direction='in', # Put ticks inside and outside the axes
-                            top=True, # draw ticks on the top axis
-                            right=True ) # draw ticks on right axis
-
-    # x-axis label
-    main_axes.set_xlabel(r'4-lepton invariant mass $\mathrm{m_{4l}}$ [GeV]',
-                        fontsize=13, x=1, horizontalalignment='right' )
-
-    # write y-axis label for main axes
-    main_axes.set_ylabel('Events / '+str(step_size)+' GeV',
-                            y=1, horizontalalignment='right')
-
-    # set y-axis limits for main axes
-    main_axes.set_ylim( bottom=0, top=np.amax(data_x)*1.6 )
-
-    # add minor ticks on y-axis for main axes
-    main_axes.yaxis.set_minor_locator( AutoMinorLocator() )
-
-    # draw the legend
-    main_axes.legend( frameon=False ); # no box around the legend
-
-    plt.savefig('test_histogram.png')
-    print('\n Done, histogram is saved as test_histogram.png')
+    return data_x, data_x_errors
 # -----------------------------------------------------------------------------------------
 # PIKA STUFF:
 # establishing pika connection to send and receive messages from master
@@ -142,21 +103,38 @@ connection = pika.BlockingConnection(params)
 channel = connection.channel()
 
 # create the queue, if it doesn't already exist
-channel.queue_declare(queue='data URL')
+channel.queue_declare(queue='tasks')
+channel.queue_declare(queue='results')
+
 
 # define a function to call when message is received
 def callback(ch, method, properties, body):
-    print(f' [x] Received {body}') # receives pickled url from master
-    print(f' [x] Making {body} readable')  
-    decoded_url = pickle.loads(body)# unpickling url
-
-    print(f' [x] Processing {body}')
-    process_file(decoded_url)  
+    print(f' [x] Received task') # receives pickled url from master
     
-# setup to listen for messages on queue 'messages'
-channel.basic_consume(queue='data URL',
-                      auto_ack=True,
-                      on_message_callback=callback)
+    # unpickling url
+    decoded_url = pickle.loads(body)
+    print(f' [x] Making tasks readable') 
+
+    # processing data from url 
+    print(f' [x] Processing {body}')
+    histogram = process_file(decoded_url)
+
+    # creating histogram result for data 
+    result = {'histogram' : histogram}
+
+    # setup to publish results back to the master    
+    channel.basic_publish(exchange='',
+                    routing_key='results',
+                    body=pickle.dumps(result)
+                    )
+
+# setup to listen for messages on queue 'tasks'
+channel.basic_consume(queue='tasks',
+                        on_message_callback=callback)
+    
+
+    
+
 
 # log message to show we've started listening 
 print('Waiting for messages. To exit, press CTRL+C')

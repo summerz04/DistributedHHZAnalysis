@@ -20,8 +20,9 @@ params = pika.ConnectionParameters('localhost')
 connection = pika.BlockingConnection(params)
 channel = connection.channel()
 
-# creating queue
-channel.queue_declare(queue='data URL')
+# creating queues
+channel.queue_declare(queue='tasks')
+channel.queue_declare(queue='results')
 
 # 2. get the data_15_periodD file URL
 atom.set_release('2025e-13tev-beta')
@@ -45,13 +46,43 @@ defs = {
 }
 
 samples   = atom.build_dataset(defs, skim=skim, protocol='https', cache=True)
-data15_periodD_url = samples['Data']['list'][0]
+data_urls = samples['Data']['list'][0:2] # distributing with 2 files to test it works 
 
-print('[x] Got the URL!')
+print(f'[x] Got {len(data_urls)} URLs!')
 
-#3. sending URL to worker 
-channel.basic_publish(exchange='',
-                      routing_key='data URL',
-                      body=pickle.dumps(data15_periodD_url))
+#3. sending URLs to workers
+for url in data_urls:
+    task = {'URL': url}
 
-print('[x] Sent the URL!')
+    channel.basic_publish(exchange='',
+                        routing_key='tasks',
+                        body=pickle.dumps(url))
+
+print('[x] Sent the URLs!')
+
+# 4. listening to collect results from workers 
+
+combined_results = []
+
+def collect_results(ch, method, properties, body):
+    result = pickle.loads(body)
+    combined_results.append(result['histogram'])
+
+    print(f'[x] Received {len(combined_results)} results')
+
+    # checking if the task is done
+    ch.basic_ack(delivery_tag=method.delivery_tag)
+
+    # stop consuming if all the urls have been collected 
+    if len(combined_results) == len(data_urls):
+        ch.stop_consuming()
+
+channel.basic_consume(
+    queue='results',
+    on_message_callback=collect_results
+)
+
+channel.start_consuming()
+
+final_histogram = np.sum(combined_results, axis=0)
+print('[x] Final combined histogram is ready!')
