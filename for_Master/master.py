@@ -9,8 +9,10 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import AutoMinorLocator
 import atlasopenmagic as atom
 import os
-
+# -----------------------------------------------------------------------------------------
 # 1. connecting to RabbitMQ
+# -----------------------------------------------------------------------------------------
+
 print('Master script is starting')
 
 # testing on localhost first
@@ -24,7 +26,9 @@ channel = connection.channel()
 channel.queue_declare(queue='tasks')
 channel.queue_declare(queue='results')
 
-# 2. get the data_15_periodD file URL
+# -----------------------------------------------------------------------------------------
+# 2. get the data from file URLs
+# -----------------------------------------------------------------------------------------
 atom.set_release('2025e-13tev-beta')
 
 # parameters for reading data
@@ -50,16 +54,21 @@ data_urls = samples['Data']['list'][0:2] # distributing with 2 files to test it 
 
 print(f'[x] Got {len(data_urls)} URLs!')
 
+# -----------------------------------------------------------------------------------------
 #3. sending URLs to workers
+# -----------------------------------------------------------------------------------------
+
 for url in data_urls:
-    # task = {'URL': url}
+   
     channel.basic_publish(exchange='',
                         routing_key='tasks',
                         body=pickle.dumps(url))
 
 print('[x] Sent the URLs!')
 
+# -----------------------------------------------------------------------------------------
 # 4. listening to collect results from workers 
+# -----------------------------------------------------------------------------------------
 
 combined_results = []
 
@@ -83,10 +92,21 @@ channel.basic_consume(
 
 channel.start_consuming()
 
+# -----------------------------------------------------------------------------------------
+# 5. combine histograms
+# -----------------------------------------------------------------------------------------
+GeV = 1.0
 final_histogram = np.sum(combined_results, axis=0)
+step_size = 2.5 * GeV
+# scaling across events and bin width
+final_histogram = final_histogram/step_size
+
 print('[x] Final combined histogram is ready!')
 
-## histogram settings
+# -----------------------------------------------------------------------------------------
+# 6. defining histogram settings
+# -----------------------------------------------------------------------------------------
+
 MeV = 0.001
 GeV = 1.0
 xmin = 80 * GeV
@@ -100,6 +120,11 @@ bin_edges = np.arange(start=xmin, # The interval includes this value
 bin_centres = np.arange(start=xmin+step_size/2, # The interval includes this value
                         stop=xmax+step_size/2, # The interval doesn't include this value
                         step=step_size ) # Spacing between values
+
+# -----------------------------------------------------------------------------------------
+# 7. plotting final histogram
+# -----------------------------------------------------------------------------------------
+
 # *************
 # Main plot
 # *************

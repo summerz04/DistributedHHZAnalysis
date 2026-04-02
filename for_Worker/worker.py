@@ -18,6 +18,10 @@ GeV = 1.0
 variables = ['lep_pt','lep_eta','lep_phi','lep_e','lep_charge','lep_type','trigE','trigM','lep_isTrigMatched',
             'lep_isLooseID','lep_isMediumID','lep_isLooseIso','lep_type']
 
+# -----------------------------------------------------------------------------------------
+# 2. defining analysis functions
+# -----------------------------------------------------------------------------------------
+
 def cut_lep_type(lep_type):
     sum_lep_type = lep_type[:, 0] + lep_type[:, 1] + lep_type[:, 2] + lep_type[:, 3]
     lep_type_cut_bool = (sum_lep_type != 44) & (sum_lep_type != 48) & (sum_lep_type != 52)
@@ -51,10 +55,10 @@ def ID_iso_cut(IDel,IDmu,isoel,isomu,pid):
     return (ak.sum(((thispid == 13) & IDmu & isomu) | ((thispid == 11) & IDel & isoel), axis=1) == 4)
 
 # -----------------------------------------------------------------------------------------
-# defining function to process data once the data URL has been read and received
+# 3. defining function to process data once the data URL has been read and received
 # -----------------------------------------------------------------------------------------
 
-def process_file(file_URL):
+def process_file(file_URL, bin_edges): # explicitly pass bin_edges for correct plotting 
     tree = uproot.open(file_URL + ":analysis")
     print(f'There are {tree.num_entries} entries in this dataset.')
 
@@ -72,28 +76,26 @@ def process_file(file_URL):
     data_x,_ = np.histogram(ak.to_numpy(all_events['mass']),
                             bins=bin_edges ) # histogram the data
     data_x_errors = np.sqrt( data_x ) # statistical error on the data
-
     # returning histogram data
     return data_x
 # -----------------------------------------------------------------------------------------
-# defining variables for histogram, might create a separate .py file for this later on
+# 4. defining variables for histogram, might create a separate .py file for this later on
 # -----------------------------------------------------------------------------------------
 xmin = 80 * GeV
 xmax = 250 * GeV
 
 # Histogram bin setup
 step_size = 2.5 * GeV
+
 bin_edges = np.arange(start=xmin, # The interval includes this value
                     stop=xmax+step_size, # The interval doesn't include this value
                     step=step_size ) # Spacing between values
-bin_centres = np.arange(start=xmin+step_size/2, # The interval includes this value
-                        stop=xmax+step_size/2, # The interval doesn't include this value
-                        step=step_size ) # Spacing between values
 
-    # Creating histogram from data
+## editing bin_centres for plotting,
+bin_centres = (bin_edges[:-1] + bin_edges[1:]) / 2 
     
 # -----------------------------------------------------------------------------------------
-# PIKA STUFF:
+# 5. PIKA STUFF:
 # establishing pika connection to send and receive messages from master
 # -----------------------------------------------------------------------------------------
 #rabbitmq connection on machine
@@ -108,21 +110,27 @@ channel.basic_qos(prefetch_count=1)
 channel.queue_declare(queue='tasks')
 channel.queue_declare(queue='results')
 
+# -----------------------------------------------------------------------------------------
+# 6. define a function to call when message is received
+# -----------------------------------------------------------------------------------------
 
-# define a function to call when message is received
 def callback(ch, method, properties, body):
-    print(f' [x] Received task') # receives pickled url from master
+    # receives pickled url from master
+    print(f' [x] Received task') 
     
     # unpickling url
     #tasks = pickle.loads(body)
 
+    
     print(f' [x] Making tasks readable') 
-    #decoded_url = tasks['file url']
+    # decoded_url = tasks['file url']
+
+    # unpickling url 
     decoded_url = pickle.loads(body)
 
     # processing data from url 
     print(f' [x] Processing {body}')
-    histogram = process_file(decoded_url)
+    histogram = process_file(decoded_url, bin_edges)
 
     # creating histogram result for data 
     result = {'histogram' : histogram}
@@ -135,13 +143,11 @@ def callback(ch, method, properties, body):
     print('[x] Sent result back')
 
     ch.basic_ack(delivery_tag=method.delivery_tag)
+
 # setup to listen for messages on queue 'tasks'
 channel.basic_consume(queue='tasks',
                         on_message_callback=callback)
     
-
-    
-
 
 # log message to show we've started listening 
 print('Waiting for messages. To exit, press CTRL+C')
