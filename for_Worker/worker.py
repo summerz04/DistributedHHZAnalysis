@@ -69,28 +69,29 @@ def process_file(file_URL):
     all_events = ak.concatenate(sample_data)
     print(f"Events after cuts: {len(all_events)}", flush=True)
 
-
-    # -----------------------------------------------------------------------------------------
-    # defining variables for histogram, might create a separate .py file for this later on
-    # -----------------------------------------------------------------------------------------
-    xmin = 80 * GeV
-    xmax = 250 * GeV
-
-    # Histogram bin setup
-    step_size = 2.5 * GeV
-    bin_edges = np.arange(start=xmin, # The interval includes this value
-                        stop=xmax+step_size, # The interval doesn't include this value
-                        step=step_size ) # Spacing between values
-    bin_centres = np.arange(start=xmin+step_size/2, # The interval includes this value
-                            stop=xmax+step_size/2, # The interval doesn't include this value
-                            step=step_size ) # Spacing between values
-
-    # Creating histogram from data
     data_x,_ = np.histogram(ak.to_numpy(all_events['mass']),
                             bins=bin_edges ) # histogram the data
     data_x_errors = np.sqrt( data_x ) # statistical error on the data
 
-    return data_x, data_x_errors
+    # returning histogram data
+    return data_x
+# -----------------------------------------------------------------------------------------
+# defining variables for histogram, might create a separate .py file for this later on
+# -----------------------------------------------------------------------------------------
+xmin = 80 * GeV
+xmax = 250 * GeV
+
+# Histogram bin setup
+step_size = 2.5 * GeV
+bin_edges = np.arange(start=xmin, # The interval includes this value
+                    stop=xmax+step_size, # The interval doesn't include this value
+                    step=step_size ) # Spacing between values
+bin_centres = np.arange(start=xmin+step_size/2, # The interval includes this value
+                        stop=xmax+step_size/2, # The interval doesn't include this value
+                        step=step_size ) # Spacing between values
+
+    # Creating histogram from data
+    
 # -----------------------------------------------------------------------------------------
 # PIKA STUFF:
 # establishing pika connection to send and receive messages from master
@@ -101,6 +102,7 @@ params = pika.ConnectionParameters('localhost')
 # create connection to broker 
 connection = pika.BlockingConnection(params)
 channel = connection.channel()
+channel.basic_qos(prefetch_count=1)
 
 # create the queue, if it doesn't already exist
 channel.queue_declare(queue='tasks')
@@ -112,8 +114,11 @@ def callback(ch, method, properties, body):
     print(f' [x] Received task') # receives pickled url from master
     
     # unpickling url
-    decoded_url = pickle.loads(body)
+    #tasks = pickle.loads(body)
+
     print(f' [x] Making tasks readable') 
+    #decoded_url = tasks['file url']
+    decoded_url = pickle.loads(body)
 
     # processing data from url 
     print(f' [x] Processing {body}')
@@ -127,7 +132,9 @@ def callback(ch, method, properties, body):
                     routing_key='results',
                     body=pickle.dumps(result)
                     )
+    print('[x] Sent result back')
 
+    ch.basic_ack(delivery_tag=method.delivery_tag)
 # setup to listen for messages on queue 'tasks'
 channel.basic_consume(queue='tasks',
                         on_message_callback=callback)

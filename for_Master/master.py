@@ -52,8 +52,7 @@ print(f'[x] Got {len(data_urls)} URLs!')
 
 #3. sending URLs to workers
 for url in data_urls:
-    task = {'URL': url}
-
+    # task = {'URL': url}
     channel.basic_publish(exchange='',
                         routing_key='tasks',
                         body=pickle.dumps(url))
@@ -86,3 +85,59 @@ channel.start_consuming()
 
 final_histogram = np.sum(combined_results, axis=0)
 print('[x] Final combined histogram is ready!')
+
+## histogram settings
+MeV = 0.001
+GeV = 1.0
+xmin = 80 * GeV
+xmax = 250 * GeV
+
+# Histogram bin setup
+step_size = 2.5 * GeV
+bin_edges = np.arange(start=xmin, # The interval includes this value
+                    stop=xmax+step_size, # The interval doesn't include this value
+                    step=step_size ) # Spacing between values
+bin_centres = np.arange(start=xmin+step_size/2, # The interval includes this value
+                        stop=xmax+step_size/2, # The interval doesn't include this value
+                        step=step_size ) # Spacing between values
+# *************
+# Main plot
+# *************
+main_axes = plt.gca() # get current axes
+
+# plot the data points
+main_axes.errorbar(x=bin_centres, y=final_histogram,
+                    fmt='ko', # 'k' means black and 'o' is for circles
+                    label='Data')
+
+# set the x-limit of the main axes
+main_axes.set_xlim( left=xmin, right=xmax )
+
+# separation of x axis minor ticks
+main_axes.xaxis.set_minor_locator( AutoMinorLocator() )
+
+# set the axis tick parameters for the main axes
+main_axes.tick_params(which='both', # ticks on both x and y axes
+                        direction='in', # Put ticks inside and outside the axes
+                        top=True, # draw ticks on the top axis
+                        right=True ) # draw ticks on right axis
+
+# x-axis label
+main_axes.set_xlabel(r'4-lepton invariant mass $\mathrm{m_{4l}}$ [GeV]',
+                    fontsize=13, x=1, horizontalalignment='right' )
+
+# write y-axis label for main axes
+main_axes.set_ylabel('Events / '+str(step_size)+' GeV',
+                        y=1, horizontalalignment='right')
+
+# set y-axis limits for main axes
+main_axes.set_ylim( bottom=0, top=np.amax(final_histogram)*1.6 )
+
+# add minor ticks on y-axis for main axes
+main_axes.yaxis.set_minor_locator( AutoMinorLocator() )
+
+# draw the legend
+main_axes.legend( frameon=False ); # no box around the legend
+
+plt.savefig('combined_test_histogram.png')
+print('\n Done, histogram is saved as combined_test_histogram.png')
