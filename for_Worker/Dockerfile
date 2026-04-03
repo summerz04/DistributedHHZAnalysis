@@ -8,6 +8,6 @@ WORKDIR /app
 COPY worker.py /app/worker.py 
 
 #packages to install for worker scripts, processing the data
-RUN pip install --no-cache-dir numpy pika uproot awkward vector matplotlib atlasopenmagic
+RUN pip install --no-cache-dir numpy pika uproot awkward vector matplotlib atlasopenmagic aiohttp requests 
 
 CMD ["python", "worker.py"]

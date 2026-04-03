@@ -59,6 +59,10 @@ def ID_iso_cut(IDel,IDmu,isoel,isomu,pid):
 # -----------------------------------------------------------------------------------------
 
 def process_file(file_URL, bin_edges): # explicitly pass bin_edges for correct plotting 
+    
+    #debugging
+    print(f'######DEBUG URL:{file_URL} ')
+    
     tree = uproot.open(file_URL + ":analysis")
     print(f'There are {tree.num_entries} entries in this dataset.')
 
