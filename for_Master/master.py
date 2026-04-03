@@ -170,6 +170,7 @@ main_axes.legend( frameon=False ); # no box around the legend
 # saving histogram to container 
 
 import os
-os.makedirs('/app/data')
-plt.savefig('app/data/combined_test_histogram.png')
+# create directory IF it doesnt exist already 
+os.makedirs('/app/data', exist_ok=True)
+plt.savefig('/app/data/combined_test_histogram.png')
 print('\n Done, histogram is saved as combined_test_histogram.png')
