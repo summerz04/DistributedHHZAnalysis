@@ -16,7 +16,10 @@ import os
 print('Master script is starting')
 
 # testing on localhost first
-params = pika.ConnectionParameters('localhost')
+# params = pika.ConnectionParameters('localhost')
+
+# for using rabbitmq broker on docker 
+params = pika.ConnectionParameters('rabbitmq')
 
 # creating connect to broker
 connection = pika.BlockingConnection(params)
@@ -97,9 +100,9 @@ channel.start_consuming()
 # -----------------------------------------------------------------------------------------
 GeV = 1.0
 final_histogram = np.sum(combined_results, axis=0)
-step_size = 2.5 * GeV
+# step_size = 2.5 * GeV
 # scaling across events and bin width
-final_histogram = final_histogram/step_size
+#final_histogram = final_histogram
 
 print('[x] Final combined histogram is ready!')
 
@@ -164,5 +167,9 @@ main_axes.yaxis.set_minor_locator( AutoMinorLocator() )
 # draw the legend
 main_axes.legend( frameon=False ); # no box around the legend
 
-plt.savefig('combined_test_histogram.png')
+# saving histogram to container 
+
+import os
+os.makedirs('/app/data')
+plt.savefig('app/data/combined_test_histogram.png')
 print('\n Done, histogram is saved as combined_test_histogram.png')

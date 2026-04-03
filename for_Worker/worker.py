@@ -99,7 +99,11 @@ bin_centres = (bin_edges[:-1] + bin_edges[1:]) / 2
 # establishing pika connection to send and receive messages from master
 # -----------------------------------------------------------------------------------------
 #rabbitmq connection on machine
-params = pika.ConnectionParameters('localhost')
+#params = pika.ConnectionParameters('localhost')
+
+# rabbitmq broker on docker
+params = pika.ConnectionParameters('rabbitmq')
+
 
 # create connection to broker 
 connection = pika.BlockingConnection(params)

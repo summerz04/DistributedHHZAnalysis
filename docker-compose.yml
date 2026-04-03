@@ -12,17 +12,30 @@ services:
       interval: 30s
       timeout: 30s
       retries: 3
-  #master: 
-  #build: for_Master/.
-  #command: python master.py
-  #depends_on: 
-  #  - rabbit_mq 
+
+  master: 
+    build: for_Master/.
+    
+    # creating volume to get histogram on machine
+    volumes:
+      - ./data:/app/data
+    networks: 
+      - rabbit
+
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+        restart: true
+    command: python master.py
+
+  
+
 
   worker:
     build: for_Worker/.
     networks:
       - rabbit
-   
+  
     depends_on:
       rabbitmq:
         condition: service_healthy
