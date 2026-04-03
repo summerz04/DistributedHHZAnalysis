@@ -123,7 +123,7 @@ bin_edges = np.arange(start=xmin, # The interval includes this value
 bin_centres = np.arange(start=xmin+step_size/2, # The interval includes this value
                         stop=xmax+step_size/2, # The interval doesn't include this value
                         step=step_size ) # Spacing between values
-
+histogram_errors = np.sqrt(final_histogram) # Calculating statistical error
 # -----------------------------------------------------------------------------------------
 # 7. plotting final histogram
 # -----------------------------------------------------------------------------------------
@@ -134,7 +134,7 @@ bin_centres = np.arange(start=xmin+step_size/2, # The interval includes this val
 main_axes = plt.gca() # get current axes
 
 # plot the data points
-main_axes.errorbar(x=bin_centres, y=final_histogram,
+main_axes.errorbar(x=bin_centres, y=final_histogram, yerr= histogram_errors,
                     fmt='ko', # 'k' means black and 'o' is for circles
                     label='Data')
 
