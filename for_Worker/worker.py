@@ -15,9 +15,16 @@ from matplotlib.ticker import AutoMinorLocator
 MeV = 0.001
 GeV = 1.0
 
+# Set luminosity to 36.6 fb-1, data size of the full release
+lumi = 36.6
+
+# Controls the fraction of all events analysed
+fraction = 1.0 # reduce this is if you want quicker runtime (implemented in the loop over the tree)
+
+
 variables = ['lep_pt','lep_eta','lep_phi','lep_e','lep_charge','lep_type','trigE','trigM','lep_isTrigMatched',
             'lep_isLooseID','lep_isMediumID','lep_isLooseIso','lep_type']
-
+weight_variables =  ["filteff","kfac","xsec","mcWeight","ScaleFactor_PILEUP", "ScaleFactor_ELE", "ScaleFactor_MUON", "ScaleFactor_LepTRIGGER"]
 # -----------------------------------------------------------------------------------------
 # 2. defining analysis functions
 # -----------------------------------------------------------------------------------------
@@ -49,39 +56,93 @@ def cut_trig_match(lep_trigmatch):
 def cut_trig(trigE,trigM):
     return trigE | trigM
 
-
 def ID_iso_cut(IDel,IDmu,isoel,isomu,pid):
     thispid = pid
     return (ak.sum(((thispid == 13) & IDmu & isomu) | ((thispid == 11) & IDel & isoel), axis=1) == 4)
 
+# for MC weights calculation
+def calc_weight(weight_variables, events):
+    total_weight = lumi * 1000 / events["sum_of_weights"]
+    for variable in weight_variables:
+        total_weight = total_weight * abs(events[variable])
+    return total_weight
 # -----------------------------------------------------------------------------------------
 # 3. defining function to process data once the data URL has been read and received
 # -----------------------------------------------------------------------------------------
 
-def process_file(file_URL, bin_edges): # explicitly pass bin_edges for correct plotting 
-    
-    #debugging
-    print(f'######DEBUG URL:{file_URL} ')
-    
+def process_file(file_URL, sample, bin_edges):
+
     tree = uproot.open(file_URL + ":analysis")
-    print(f'There are {tree.num_entries} entries in this dataset.')
 
-    sample_data = []
+    total_hist = np.zeros(len(bin_edges) - 1)
 
-    for data in tree.iterate(variables, library='ak'):
-        data = data[~cut_lep_type(data['lep_type'])]
-        data = data[~cut_lep_charge(data['lep_charge'])]
-        data['mass'] = calc_mass(data['lep_pt'], data['lep_eta'], data['lep_phi'], data['lep_e'])
-        sample_data.append(data)
+    for data in tree.iterate(
+        variables + weight_variables + ["sum_of_weights", "lep_n"],
+        library='ak'
+    ):
 
-    all_events = ak.concatenate(sample_data)
-    print(f"Events after cuts: {len(all_events)}", flush=True)
+        # --- SAME CUTS AS NOTEBOOK ---
+        data = data[cut_trig(data.trigE, data.trigM)]
+        data = data[cut_trig_match(data.lep_isTrigMatched)]
 
-    data_x,_ = np.histogram(ak.to_numpy(all_events['mass']),
-                            bins=bin_edges ) # histogram the data
-    data_x_errors = np.sqrt( data_x ) # statistical error on the data
-    # returning histogram data
-    return data_x
+        data['leading_lep_pt'] = data['lep_pt'][:,0]
+        data['sub_leading_lep_pt'] = data['lep_pt'][:,1]
+        data['third_leading_lep_pt'] = data['lep_pt'][:,2]
+
+        data = data[data['leading_lep_pt'] > 20]
+        data = data[data['sub_leading_lep_pt'] > 15]
+        data = data[data['third_leading_lep_pt'] > 10]
+
+        data = data[ID_iso_cut(
+            data.lep_isLooseID,
+            data.lep_isMediumID,
+            data.lep_isLooseIso,
+            data.lep_isLooseIso,
+            data.lep_type
+        )]
+
+        data = data[~cut_lep_type(data.lep_type)]
+        data = data[~cut_lep_charge(data.lep_charge)]
+
+        
+        mass = calc_mass(data.lep_pt, data.lep_eta, data.lep_phi, data.lep_e)
+
+     
+        if "data" not in sample.lower():
+            weights = calc_weight(weight_variables, data)
+            hist, _ = np.histogram(
+                ak.to_numpy(mass),
+                bins=bin_edges,
+                weights=ak.to_numpy(weights)
+            )
+        else:
+            hist, _ = np.histogram(
+                ak.to_numpy(mass),
+                bins=bin_edges
+            )
+
+        # adding all histograms of each sample in url
+        total_hist += hist
+
+    return total_hist 
+## new MC plot code
+
+## old code
+#    for data in tree.iterate(variables, library='ak'):
+#        data = data[~cut_lep_type(data['lep_type'])]
+#        data = data[~cut_lep_charge(data['lep_charge'])]
+#        data['mass'] = calc_mass(data['lep_pt'], data['lep_eta'], data['lep_phi'], data['lep_e'])
+#        sample_data.append(data)##
+#
+#    all_events = ak.concatenate(sample_data)
+#    print(f"Events after cuts: {len(all_events)}", flush=True)###
+
+#    data_x,_ = np.histogram(ak.to_numpy(all_events['mass']),
+#                            bins=bin_edges ) # histogram the data
+#    data_x_errors = np.sqrt( data_x ) # statistical error on the data
+#    # returning histogram data
+#    return data_x
+    ## old code
 # -----------------------------------------------------------------------------------------
 # 4. defining variables for histogram, might create a separate .py file for this later on
 # -----------------------------------------------------------------------------------------
@@ -125,23 +186,20 @@ channel.queue_declare(queue='results')
 def callback(ch, method, properties, body):
     # receives pickled url from master
     print(f' [x] Received task') 
-    
-    # unpickling url
-    #tasks = pickle.loads(body)
-
-    
+   
+   # unpickling task 
     print(f' [x] Making tasks readable') 
-    # decoded_url = tasks['file url']
+    task = pickle.loads(body)
 
-    # unpickling url 
-    decoded_url = pickle.loads(body)
+    file_url = task['file']
+    sample = task['sample']
 
     # processing data from url 
     print(f' [x] Processing {body}')
-    histogram = process_file(decoded_url, bin_edges)
+    histogram = process_file(file_url, sample, bin_edges)
 
     # creating histogram result for data 
-    result = {'histogram' : histogram}
+    result = {'sample':sample, 'file': file_url, 'histogram' : histogram}
 
     # setup to publish results back to the master    
     channel.basic_publish(exchange='',
