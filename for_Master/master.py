@@ -80,8 +80,9 @@ print(f'[x] Sent {total_tasks} tasks to all workers!')
 
 # storing as dictionary to combine results with appropriate keys
 combined_results = {s: [] for s in samples}
-
+received_tasks = 0
 def collect_results(ch, method, properties, body):
+    global received_tasks
     result = pickle.loads(body)
 
     # sample processed 
@@ -93,14 +94,15 @@ def collect_results(ch, method, properties, body):
     combined_results[sample].append(hist)
 
     # receiving results for specific sample 
+    received_tasks += 1
     print(f'[x] Received results for {sample}')
 
     # checking if the task is done
     ch.basic_ack(delivery_tag=method.delivery_tag)
 
     # stop consuming if results from all tasks have been collected 
-    #if len(combined_results) == total_tasks:
-    #    ch.stop_consuming()
+    if received_tasks == total_tasks:
+        ch.stop_consuming()
 
 channel.basic_consume(
     queue='results',
@@ -111,8 +113,6 @@ channel.start_consuming()
 # -----------------------------------------------------------------------------------------
 # 5. combining results and MC weights calculated from workers 
 # -----------------------------------------------------------------------------------------
-
-GeV = 1.0
 
 final_histograms = {
     s: np.sum(hists, axis=0)
@@ -142,26 +142,27 @@ bin_centres = np.arange(start=xmin+step_size/2, # The interval includes this val
 # -----------------------------------------------------------------------------------------
 # 7. preparing for final histogram plot
 # -----------------------------------------------------------------------------------------
+# getting histogram data 
 data_x = final_histograms['Data']
-
 # Calculating statistical error
 data_x_errors = np.sqrt(data_x) 
 
-signal_x = ak.to_numpy(final_histograms[r'Signal ($m_H$ = 125 GeV)']['mass']) # histogram the signal
-signal_weights = ak.to_numpy(final_histograms[r'Signal ($m_H$ = 125 GeV)'].totalWeight) # get the weights of the signal events
-signal_color = samples[r'Signal ($m_H$ = 125 GeV)']['color'] # get the colour for the signal bar
+#signal_x = ak.to_numpy(final_histograms[r'Signal ($m_H$ = 125 GeV)']['mass']) # histogram the signal
+#signal_weights = ak.to_numpy(final_histograms[r'Signal ($m_H$ = 125 GeV)'].totalWeight) # get the weights of the signal events
+#signal_color = samples[r'Signal ($m_H$ = 125 GeV)']['color'] # get the colour for the signal bar
 
 mc_x = [] # define list to hold the Monte Carlo histogram entries
 mc_weights = [] # define list to hold the Monte Carlo weights
 mc_colors = [] # define list to hold the colors of the Monte Carlo bars
 mc_labels = [] # define list to hold the legend labels of the Monte Carlo bars
 
-for s in samples: # loop over samples
+for s in samples: # not awkward arrays anymore, loop over samples
     if s not in ['Data', r'Signal ($m_H$ = 125 GeV)']: # if not data nor signal
-        mc_x.append( ak.to_numpy(final_histograms[s]['mass']) ) # append to the list of Monte Carlo histogram entries
-        mc_weights.append( ak.to_numpy(final_histograms[s].totalWeight) ) # append to the list of Monte Carlo weights
+        mc_x.append((final_histograms[s]) ) # append to the list of Monte Carlo histogram entries
+        mc_weights.append(np.ones_like(final_histograms[s])) # append to the list of Monte Carlo weights
         mc_colors.append( samples[s]['color'] ) # append to the list of Monte Carlo bar colors
         mc_labels.append( s ) # append to the list of Monte Carlo legend labels
+
 # *************
 # Main plot
 # *************
@@ -183,9 +184,13 @@ mc_x_tot = mc_heights[0][-1] # stacked background MC y-axis value
 mc_x_err = np.sqrt(np.histogram(np.hstack(mc_x), bins=bin_edges, weights=np.hstack(mc_weights)**2)[0])
 
 # plot the signal bar
-signal_heights = main_axes.hist(signal_x, bins=bin_edges, bottom=mc_x_tot,
-                weights=signal_weights, color=signal_color,
-                label=r'Signal ($m_H$ = 125 GeV)')
+signal_hist = final_histograms[r'Signal ($m_H$ = 125 GeV)']
+main_axes.bar(bin_centres, signal_hist, bottom=mc_x_tot, width=step_size,
+              color=samples[r'Signal ($m_H$ = 125 GeV)']['color'],
+              label=r'Signal ($m_H$ = 125 GeV)')
+#signal_heights = main_axes.hist(signal_hist, bins=bin_edges, bottom=mc_x_tot,
+#                weights=signal_weights, color=signal_color,
+#                label=r'Signal ($m_H$ = 125 GeV)')
 
 # plot the statistical uncertainty
 main_axes.bar(bin_centres, # x
