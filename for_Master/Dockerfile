@@ -8,6 +8,6 @@ WORKDIR /app
 COPY master.py /app/master.py 
 #COPY shared/analysis_functions.py /app/analysis_functions.py
 
-RUN pip install --no-cache-dir numpy matplotlib atlasopenmagic pika awkward
+RUN pip install --no-cache-dir numpy matplotlib atlasopenmagic pika awkward 
 
 CMD ["python", "master.py"]

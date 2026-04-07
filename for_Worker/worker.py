@@ -6,6 +6,7 @@ import numpy as np
 import uproot
 import awkward as ak
 import vector 
+import time 
 import atlasopenmagic as atom 
 import matplotlib.pyplot as plt
 from matplotlib.ticker import AutoMinorLocator
@@ -168,8 +169,26 @@ bin_centres = (bin_edges[:-1] + bin_edges[1:]) / 2
 
 # rabbitmq broker on docker
 params = pika.ConnectionParameters('rabbitmq')
+def rabbitmq_connect(host, retries=5, delay=5):
+    for i in range(retries):
+        try:
+        # creating connect to broker
+            connection = pika.BlockingConnection(params)
+            print('Connected to RabbitMQ successfully')
+            return connection
+        except Exception:
+            print(f'Unable to connect to RabbitMQ')
+            print(f'Retrying')
+            time.sleep(delay)
+    raise Exception('Could not connect to RabbitMQ')
 
 
+connection = rabbitmq_connect('rabbitmq')
+channel = connection.channel()
+
+# creating queues
+channel.queue_declare(queue='tasks')
+channel.queue_declare(queue='results')
 # create connection to broker 
 connection = pika.BlockingConnection(params)
 channel = connection.channel()

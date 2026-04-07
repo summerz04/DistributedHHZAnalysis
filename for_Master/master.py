@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import AutoMinorLocator
 import atlasopenmagic as atom
 import awkward as ak
+import time # for retrying RabbitMQ connection
 import os
 # -----------------------------------------------------------------------------------------
 # 1. connecting to RabbitMQ
@@ -21,9 +22,22 @@ print('Master script is starting')
 
 # for using rabbitmq broker on docker 
 params = pika.ConnectionParameters('rabbitmq')
+def rabbitmq_connect(host, retries=5, delay=5):
+    for i in range(retries):
+        try:
 
-# creating connect to broker
-connection = pika.BlockingConnection(params)
+    # creating connect to broker
+            connection = pika.BlockingConnection(params)
+            print('Connected to RabbitMQ successfully')
+            return connection
+        except Exception:
+            print(f'Unable to connect to RabbitMQ')
+            print(f'Retrying')
+            time.sleep(delay)
+    raise Exception('Could not connect to RabbitMQ')
+
+
+connection = rabbitmq_connect('rabbitmq')
 channel = connection.channel()
 
 # creating queues
@@ -173,19 +187,29 @@ main_axes.errorbar(x=bin_centres, y=data_x, yerr=data_x_errors,
                     fmt='ko', # 'k' means black and 'o' is for circles
                     label='Data')
 
-# plot the Monte Carlo bars
-mc_heights = main_axes.hist(mc_x, bins=bin_edges,
-                            weights=mc_weights, stacked=True,
-                            color=mc_colors, label=mc_labels )
+# plotting must be modified, as collected results from workers are histograms already
 
-mc_x_tot = mc_heights[0][-1] # stacked background MC y-axis value
+#mc_heights = main_axes.bar(x=mc_x, bins=bin_edges,
+#                            weights=mc_weights, stacked=True,
+#                            color=mc_colors, label=mc_labels )
 
-# calculate MC statistical uncertainty: sqrt(sum w^2)
-mc_x_err = np.sqrt(np.histogram(np.hstack(mc_x), bins=bin_edges, weights=np.hstack(mc_weights)**2)[0])
+# creating empty histogram canvas to plot stacked histograms correctly
+mc_x_tot =  np.zeros_like(bin_centres)
+
+for i, s in enumerate(samples):
+    if s not in ['Data', r'Signal ($m_H$ = 125 GeV)']:
+        hist = final_histograms[s]
+
+        main_axes.bar(bin_centres, hist, bottom=mc_x_tot,
+        width=step_size, color = samples[s]['color'], label=s)
+
+        mc_x_tot += hist
+
+mc_x_err = np.sqrt(mc_x_tot)
 
 # plot the signal bar
 signal_hist = final_histograms[r'Signal ($m_H$ = 125 GeV)']
-main_axes.bar(bin_centres, signal_hist, bottom=mc_x_tot, width=step_size,
+main_axes.bar(x=bin_centres, height=signal_hist, bottom=mc_x_tot, width=step_size,
               color=samples[r'Signal ($m_H$ = 125 GeV)']['color'],
               label=r'Signal ($m_H$ = 125 GeV)')
 #signal_heights = main_axes.hist(signal_hist, bins=bin_edges, bottom=mc_x_tot,
@@ -193,8 +217,8 @@ main_axes.bar(bin_centres, signal_hist, bottom=mc_x_tot, width=step_size,
 #                label=r'Signal ($m_H$ = 125 GeV)')
 
 # plot the statistical uncertainty
-main_axes.bar(bin_centres, # x
-                2*mc_x_err, # heights
+main_axes.bar(x =bin_centres, # x
+                height = 2*mc_x_err, # heights
                 alpha=0.5, # half transparency
                 bottom=mc_x_tot-mc_x_err, color='none',
                 hatch="////", width=step_size, label='Stat. Unc.' )
@@ -262,5 +286,5 @@ my_legend = main_axes.legend( frameon=False, fontsize=16 ) # no box around the l
 import os
 # create directory IF it doesnt exist already 
 os.makedirs('/app/data', exist_ok=True)
-plt.savefig('/app/data/final_mc_histogram.png')
-print('\n Done, histogram is saved as final_mc_histogram.png')
+plt.savefig('/app/data/try2_final_mc_histogram.png')
+print('\n Done, histogram is saved as try2_final_mc_histogram.png')
