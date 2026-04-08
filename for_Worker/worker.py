@@ -1,4 +1,5 @@
-# receives the data15_periodD_url from master 
+# worker receives section of samples data from master, processes data, and each sends calculated partial histogram back to 
+# master for final plot
 
 import pika 
 import pickle
@@ -10,6 +11,7 @@ import time
 import atlasopenmagic as atom 
 import matplotlib.pyplot as plt
 from matplotlib.ticker import AutoMinorLocator
+
 # -----------------------------------------------------------------------------------------
 # 1. setting up analysis functions and variables 
 # -----------------------------------------------------------------------------------------
@@ -48,7 +50,6 @@ def calc_mass(lep_pt, lep_eta, lep_phi, lep_e):
     invariant_mass = (p4[:, 0] + p4[:, 1] + p4[:, 2] + p4[:, 3]).M # .M calculates the invariant mass
     return invariant_mass
 
-
 def cut_trig_match(lep_trigmatch):
     trigmatch = lep_trigmatch
     cut1 = ak.sum(trigmatch, axis=1) >= 1
@@ -67,6 +68,7 @@ def calc_weight(weight_variables, events):
     for variable in weight_variables:
         total_weight = total_weight * abs(events[variable])
     return total_weight
+
 # -----------------------------------------------------------------------------------------
 # 3. defining function to process data once the data URL has been read and received
 # -----------------------------------------------------------------------------------------
@@ -126,24 +128,7 @@ def process_file(file_URL, sample, bin_edges):
         total_hist += hist
 
     return total_hist 
-## new MC plot code
 
-## old code
-#    for data in tree.iterate(variables, library='ak'):
-#        data = data[~cut_lep_type(data['lep_type'])]
-#        data = data[~cut_lep_charge(data['lep_charge'])]
-#        data['mass'] = calc_mass(data['lep_pt'], data['lep_eta'], data['lep_phi'], data['lep_e'])
-#        sample_data.append(data)##
-#
-#    all_events = ak.concatenate(sample_data)
-#    print(f"Events after cuts: {len(all_events)}", flush=True)###
-
-#    data_x,_ = np.histogram(ak.to_numpy(all_events['mass']),
-#                            bins=bin_edges ) # histogram the data
-#    data_x_errors = np.sqrt( data_x ) # statistical error on the data
-#    # returning histogram data
-#    return data_x
-    ## old code
 # -----------------------------------------------------------------------------------------
 # 4. defining variables for histogram, might create a separate .py file for this later on
 # -----------------------------------------------------------------------------------------
@@ -161,11 +146,8 @@ bin_edges = np.arange(start=xmin, # The interval includes this value
 bin_centres = (bin_edges[:-1] + bin_edges[1:]) / 2 
     
 # -----------------------------------------------------------------------------------------
-# 5. PIKA STUFF:
-# establishing pika connection to send and receive messages from master
+# 5. establishing pika connection to send and receive messages from master
 # -----------------------------------------------------------------------------------------
-#rabbitmq connection on machine
-#params = pika.ConnectionParameters('localhost')
 
 # rabbitmq broker on docker
 params = pika.ConnectionParameters('rabbitmq')

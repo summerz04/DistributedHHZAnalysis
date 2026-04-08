@@ -1,6 +1,4 @@
-# master file should read data, send data to workers, and then collect results back to plot the final histogram
-
-# for now, i will simply just try to recreate the notebook, and distribute it to one worker
+# master file should read from ATLAS database, send data urls to workers, and then collect results back to plot the final histogram
 
 import pika
 import pickle
@@ -17,11 +15,10 @@ import os
 
 print('Master script is starting')
 
-# testing on localhost first
-# params = pika.ConnectionParameters('localhost')
-
 # for using rabbitmq broker on docker 
 params = pika.ConnectionParameters('rabbitmq')
+
+# connection retry to RabbitMQ
 def rabbitmq_connect(host, retries=5, delay=5):
     for i in range(retries):
         try:
@@ -45,7 +42,7 @@ channel.queue_declare(queue='tasks')
 channel.queue_declare(queue='results')
 
 # -----------------------------------------------------------------------------------------
-# 2. building dataset
+# 2. reading from ATLAS' database and building sammple dataset
 # -----------------------------------------------------------------------------------------
 atom.set_release('2025e-13tev-beta')
 
@@ -161,9 +158,6 @@ data_x = final_histograms['Data']
 # Calculating statistical error
 data_x_errors = np.sqrt(data_x) 
 
-#signal_x = ak.to_numpy(final_histograms[r'Signal ($m_H$ = 125 GeV)']['mass']) # histogram the signal
-#signal_weights = ak.to_numpy(final_histograms[r'Signal ($m_H$ = 125 GeV)'].totalWeight) # get the weights of the signal events
-#signal_color = samples[r'Signal ($m_H$ = 125 GeV)']['color'] # get the colour for the signal bar
 
 mc_x = [] # define list to hold the Monte Carlo histogram entries
 mc_weights = [] # define list to hold the Monte Carlo weights
@@ -188,11 +182,6 @@ main_axes.errorbar(x=bin_centres, y=data_x, yerr=data_x_errors,
                     label='Data')
 
 # plotting must be modified, as collected results from workers are histograms already
-
-#mc_heights = main_axes.bar(x=mc_x, bins=bin_edges,
-#                            weights=mc_weights, stacked=True,
-#                            color=mc_colors, label=mc_labels )
-
 # creating empty histogram canvas to plot stacked histograms correctly
 mc_x_tot =  np.zeros_like(bin_centres)
 
@@ -212,9 +201,7 @@ signal_hist = final_histograms[r'Signal ($m_H$ = 125 GeV)']
 main_axes.bar(x=bin_centres, height=signal_hist, bottom=mc_x_tot, width=step_size,
               color=samples[r'Signal ($m_H$ = 125 GeV)']['color'],
               label=r'Signal ($m_H$ = 125 GeV)')
-#signal_heights = main_axes.hist(signal_hist, bins=bin_edges, bottom=mc_x_tot,
-#                weights=signal_weights, color=signal_color,
-#                label=r'Signal ($m_H$ = 125 GeV)')
+
 
 # plot the statistical uncertainty
 main_axes.bar(x =bin_centres, # x
@@ -281,10 +268,9 @@ plt.text(0.1, # x
 my_legend = main_axes.legend( frameon=False, fontsize=16 ) # no box around the legend
 
 #---------
-#saving histogram to container and local machine
+#8. saving histogram to container and local machine
 #---------
-import os
-# create directory IF it doesnt exist already 
+# create local data directory IF it doesnt exist already 
 os.makedirs('/app/data', exist_ok=True)
 plt.savefig('/app/data/2worker_final_mc_histogram.png')
 print('\n Done, histogram is saved as 2worker_final_mc_histogram.png')
