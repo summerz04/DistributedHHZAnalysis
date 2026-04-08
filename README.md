@@ -4,6 +4,8 @@
 
 This repository contains a distributed solution of ATLAS' Higgs boson (HZZ) analysis developed using the Docker Desktop tool. The project's aim is to use cloud technologies to create a theoretically scalable HZZ analysis processing system that requires as least human intervention as possible. 
 
+The main branch contains the final solution. Other branches contain versions to gradually build up to the final solution, such as testing RabbitMQ connections, and building the final plots. 
+
 ## Usage instructions 
 > To build and run containers: 
 docker-compose can be used to build all containers using the command below:
@@ -19,7 +21,7 @@ and the containers can be stopped using
 ```bash
 docker-compose down
 ```
-> To create a distributed multi-node system using docker swarm
+To create a distributed multi-node system using docker swarm
 The build-in Docker Swarn Engine within Docker is a tool for container orchestration, and useful for scaling multi-node systems. To use Docker Swarm, see the commands and explanations below: 
 
 1. Initialise a swarm:
