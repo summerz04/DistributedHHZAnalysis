@@ -1,4 +1,4 @@
-# master script will just read all the data 
+# master reads from ATLAS database and plots final histogram
 FROM python:3.11
 
 # set working directory to /app within the container  
@@ -6,8 +6,8 @@ WORKDIR /app
 
 # copying pythons scripts into container
 COPY master.py /app/master.py 
-#COPY shared/analysis_functions.py /app/analysis_functions.py
 
+# downloading necessary libraries
 RUN pip install --no-cache-dir numpy matplotlib atlasopenmagic pika awkward 
 
 CMD ["python", "master.py"]
