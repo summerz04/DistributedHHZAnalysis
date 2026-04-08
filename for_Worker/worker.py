@@ -182,21 +182,15 @@ def rabbitmq_connect(host, retries=5, delay=5):
             time.sleep(delay)
     raise Exception('Could not connect to RabbitMQ')
 
-
+# create connection to broker 
 connection = rabbitmq_connect('rabbitmq')
 channel = connection.channel()
 
 # creating queues
 channel.queue_declare(queue='tasks')
 channel.queue_declare(queue='results')
-# create connection to broker 
-connection = pika.BlockingConnection(params)
-channel = connection.channel()
 channel.basic_qos(prefetch_count=1)
 
-# create the queue, if it doesn't already exist
-channel.queue_declare(queue='tasks')
-channel.queue_declare(queue='results')
 
 # -----------------------------------------------------------------------------------------
 # 6. define a function to call when message is received

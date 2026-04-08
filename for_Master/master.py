@@ -286,5 +286,5 @@ my_legend = main_axes.legend( frameon=False, fontsize=16 ) # no box around the l
 import os
 # create directory IF it doesnt exist already 
 os.makedirs('/app/data', exist_ok=True)
-plt.savefig('/app/data/try2_final_mc_histogram.png')
-print('\n Done, histogram is saved as try2_final_mc_histogram.png')
+plt.savefig('/app/data/2worker_final_mc_histogram.png')
+print('\n Done, histogram is saved as 2worker_final_mc_histogram.png')

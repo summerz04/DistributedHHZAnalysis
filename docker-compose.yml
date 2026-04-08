@@ -22,6 +22,7 @@ services:
     networks: 
       - rabbit
 
+
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -35,6 +36,9 @@ services:
     build: for_Worker/.
     networks:
       - rabbit
+    deploy:
+      mode: replicated
+      replicas: 3
   
     depends_on:
       rabbitmq:
